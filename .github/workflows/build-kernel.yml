@@ -46,17 +46,18 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX 1: Fix missing VCN firmware for the main kernel build
+          # HOTFIX 1: Fix missing VCN firmware and missing strncpy definition
           (
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
+            sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
           ) &
           
-          # HOTFIX 2: Skip the IW620 Wi-Fi driver build entirely using dynamic search
-          # This finds the script containing the driver compilation command and 
-          # replaces it with a command that generates empty dummy files instead.
-          grep -rl "make -C /src" image/ | xargs sed -i 's|make -C /src.*modules|touch mlan.ko moal.ko|g'
+          # HOTFIX 2: Forcefully apply the Kernel 7.2 compatibility patch
+          # This searches for the script that clones the NXP driver and dynamically 
+          # injects a 'git apply' command right after the clone completes.
+          grep -rl "nxp-mwifiex" image/ 2>/dev/null | xargs -r sed -i 's|\(git clone.*nxp-mwifiex.*\)|\1\n    git -C /tmp/nxp-mwifiex apply /tmp/ps5-linux-mwifiex/ps5-iw620-kernel72-compat.patch 2>/dev/null \|\| true|g'
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
