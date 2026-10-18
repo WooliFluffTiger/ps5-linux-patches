@@ -46,26 +46,17 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX: Background watcher to patch the kernel and the Wi-Fi driver installer
+          # HOTFIX 1 & 2: Firmware path copy and string header alias
           (
-            # Wait for the linux source directory to be created
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
-            
-            # 1. Fix firmware path
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
-            
-            # 2. Fix NXP mwifiex 'strncpy' implicit declaration
             sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
-
-            # Wait for the Wi-Fi driver repo to be cloned into /tmp inside the container.
-            # Since we are outside the container, we have to modify the entrypoint script
-            # to run the patch forcefully inside the container before the driver builds.
-            sed -i '/git clone.*ps5-linux-mwifiex/a \
-            sed -i "s/if .*KERNEL_VERSION >= 7.2.*/if true; then/" /tmp/ps5-linux-mwifiex/install.sh \
-            && sed -i "/KERNEL_VERSION >= 7.2/d" /tmp/ps5-linux-mwifiex/install.sh' image/docker/kernel-builder/entrypoint.sh
-            
           ) &
+          
+          # HOTFIX 3: Find the hardcoded build script and forcefully inject the 
+          # 7.2 API compatibility patch right before it runs 'make'.
+          grep -rl "make -C /src M=" image/ | xargs sed -i 's|make -C /src M=|git -C /tmp/nxp-mwifiex apply /tmp/ps5-linux-mwifiex/ps5-iw620-kernel72-compat.patch; make -C /src M=|g'
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
