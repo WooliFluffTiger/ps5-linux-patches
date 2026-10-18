@@ -3,7 +3,7 @@
 ## Compilation
 
 ```bash
-git clone https://github.com/ps5-linux/ps5-linux-patches
+git clone https://github.com/WooliFluffTiger/ps5-linux-patches
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
 cd linux
 git checkout "tags/v$(grep -m1 "^# Linux/" ../ps5-linux-patches/.config | awk '{print $3}')"
