@@ -37,7 +37,7 @@ jobs:
       - name: Checkout image builder
         uses: actions/checkout@v6
         with:
-          repository: ps5-linux/ps5-linux-image
+          repository: WooliFluffTiger/ps5-linux-image
           path: image
           ref: main
 
@@ -53,11 +53,6 @@ jobs:
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
             sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
           ) &
-          
-          # HOTFIX 2: Forcefully apply the Kernel 7.2 compatibility patch
-          # This searches for the script that clones the NXP driver and dynamically 
-          # injects a 'git apply' command right after the clone completes.
-          grep -rl "nxp-mwifiex" image/ 2>/dev/null | xargs -r sed -i 's|\(git clone.*nxp-mwifiex.*\)|\1\n    git -C /tmp/nxp-mwifiex apply /tmp/ps5-linux-mwifiex/ps5-iw620-kernel72-compat.patch 2>/dev/null \|\| true|g'
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
