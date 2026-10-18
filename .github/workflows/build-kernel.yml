@@ -26,7 +26,7 @@ jobs:
       contents: write
 
     env:
-      CCACHE_DIR: /home/opc/ccache
+      CCACHE_DIR: /home/dylan/ccache
 
     steps:
       - name: Clean image workspace
