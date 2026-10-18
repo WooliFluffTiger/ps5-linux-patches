@@ -46,17 +46,18 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX 1: Watch for the linux source directory to be created, then copy the 
-          # firmware inside it and update the config so the Docker container can mount it.
+          # HOTFIX: Watch for the linux source directory to be created, then copy the firmware 
+          # and globally alias the deprecated strncpy function in the kernel headers.
           (
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
+            
+            # 1. Fix firmware path
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
+            
+            # 2. Fix NXP mwifiex 'strncpy' implicit declaration by aliasing it to 'strscpy'
+            sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
           ) &
-          
-          # HOTFIX 2: Find the Docker script that builds the mwifiex driver and 
-          # inject a string replacement to fix the deprecated 'strncpy' function.
-          grep -rl "nxp-mwifiex" image/ | xargs sed -i 's|make -C /src M=|find /tmp/nxp-mwifiex -name "*.c" -exec sed -i "s/strncpy/strscpy/g" {} +; make -C /src M=|g'
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
