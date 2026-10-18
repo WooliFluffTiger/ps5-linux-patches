@@ -46,13 +46,14 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX 1: Fix missing VCN firmware for the main kernel build
+          # HOTFIX 1 & 2: Firmware path copy and string header alias
           (
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
+            sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
           ) &
-          
+
           # HOTFIX 2: Skip the IW620 Wi-Fi driver build entirely
           # This replaces the compilation step with a command that generates empty 
           # dummy files so the rest of the packaging script succeeds.
@@ -61,12 +62,7 @@ jobs:
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
             --patches-ref "$PATCHES_REF"
-            
-          if [ "$FORMAT" = "all" ]; then
-            docker build -t ps5-kernel-packager-rpm \
-              -f image/docker/kernel-builder-rpm/Dockerfile image/
-            docker run --rm -v "$PWD/image/linux-bin":/out \
-              ps5-kernel-packager-rpm
+
           fi
 
       - name: Read kernel and patches version
