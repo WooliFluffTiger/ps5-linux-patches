@@ -54,11 +54,9 @@ jobs:
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
           ) &
           
-          # HOTFIX 2: Patch the Docker entrypoint script to replace 'strncpy' with 'strscpy'
-          # inside the NXP mwifiex driver source code before it compiles.
-          sed -i '/make -C \/src M=\$OUT_DIR ARCH=x86/i \
-          find $OUT_DIR -name "*.c" -exec sed -i "s/strncpy/strscpy/g" {} +' \
-          image/docker/kernel-builder/entrypoint.sh
+          # HOTFIX 2: Find the Docker script that builds the mwifiex driver and 
+          # inject a string replacement to fix the deprecated 'strncpy' function.
+          grep -rl "nxp-mwifiex" image/ | xargs sed -i 's|make -C /src M=|find /tmp/nxp-mwifiex -name "*.c" -exec sed -i "s/strncpy/strscpy/g" {} +; make -C /src M=|g'
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
