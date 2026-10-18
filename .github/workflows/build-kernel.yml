@@ -46,13 +46,19 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX: Watch for the linux source directory to be created, then copy the 
+          # HOTFIX 1: Watch for the linux source directory to be created, then copy the 
           # firmware inside it and update the config so the Docker container can mount it.
           (
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
           ) &
+          
+          # HOTFIX 2: Patch the Docker entrypoint script to replace 'strncpy' with 'strscpy'
+          # inside the NXP mwifiex driver source code before it compiles.
+          sed -i '/make -C \/src M=\$OUT_DIR ARCH=x86/i \
+          find $OUT_DIR -name "*.c" -exec sed -i "s/strncpy/strscpy/g" {} +' \
+          image/docker/kernel-builder/entrypoint.sh
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
