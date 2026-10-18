@@ -46,27 +46,31 @@ jobs:
           FORMAT="${{ inputs.format || github.event.client_payload.format || 'all' }}"
           PATCHES_REF="${{ inputs.patches_ref || '' }}"
           
-          # HOTFIX: Watch for the linux source directory to be created, then copy the firmware 
-          # and globally alias the deprecated strncpy function in the kernel headers.
+          # HOTFIX: Background watcher to patch the kernel and the Wi-Fi driver installer
           (
+            # Wait for the linux source directory to be created
             while [ ! -f "image/work/linux/.config" ]; do sleep 1; done
             
             # 1. Fix firmware path
             cp -r image/work/ps5-linux-patches/firmware image/work/linux/
             sed -i "s|../ps5-linux-patches/firmware|firmware|g" image/work/linux/.config
             
-            # 2. Fix NXP mwifiex 'strncpy' implicit declaration by aliasing it to 'strscpy'
+            # 2. Fix NXP mwifiex 'strncpy' implicit declaration
             sed -i '1i #define strncpy strscpy' image/work/linux/include/linux/string.h
+
+            # Wait for the Wi-Fi driver repo to be cloned into /tmp inside the container.
+            # Since we are outside the container, we have to modify the entrypoint script
+            # to run the patch forcefully inside the container before the driver builds.
+            sed -i '/git clone.*ps5-linux-mwifiex/a \
+            sed -i "s/if .*KERNEL_VERSION >= 7.2.*/if true; then/" /tmp/ps5-linux-mwifiex/install.sh \
+            && sed -i "/KERNEL_VERSION >= 7.2/d" /tmp/ps5-linux-mwifiex/install.sh' image/docker/kernel-builder/entrypoint.sh
+            
           ) &
           
           bash image/build_image.sh --kernel-only \
             --distro "$FORMAT" \
             --patches-ref "$PATCHES_REF"
             
-          # --distro all skips the rpm packager. Call the packager container
-          # directly against the already-staged kernel (image/linux-bin/staging/)
-          # instead of re-running build_image.sh, which wipes outputs and
-          # rebuilds the kernel — that doubled CI time. This step is ~1 minute.
           if [ "$FORMAT" = "all" ]; then
             docker build -t ps5-kernel-packager-rpm \
               -f image/docker/kernel-builder-rpm/Dockerfile image/
